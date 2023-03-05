@@ -1,202 +1,133 @@
-import configparser
+import pyodbc
+from sqlalchemy.engine import URL
+from sqlalchemy import create_engine
 import pandas as pd
 import datetime
-import warnings
+import os
 
-#bibliotecas de conexao com bancos de dados
-import sqlalchemy
-import fdb
-import cx_Oracle
-import pyodbc
-import psycopg2 as pg
+# In[ ]:Conexao com DataWareHouse - SQL Server
+def sqlserver_connect_dw():
+    server = 'tcp:mssql2.orquidea.com.br'
+    database = 'dw_tondo_bi' 
+    username = 'hunterBI' 
+    password = 'lH43r#BA8dKb'
 
-config = configparser.ConfigParser()
-config.read('config.ini')
-
-# In[ ]:Conexao com banco Firebird
-def postgresql_connect():
-    p_host = config['POSTGRESQL']['host']
-    p_database = config['POSTGRESQL']['database']
-    p_user = config['POSTGRESQL']['username']
-    p_password = config['POSTGRESQL']['password']
-   
-    connection = pg.connect(host=p_host, database=p_database, user=p_user, password=p_password)
-
-    return connection
-
-# In[ ]:Conexao com banco Firebird
-def firebird_connect():
-    #warnings.filterwarnings('ignore')
-    fdb.load_api(config['FIREBIRD']['dll_path'])
-    connection = fdb.connect(
-    database=config['FIREBIRD']['file'],
-    user=config['FIREBIRD']['user'],
-    password=config['FIREBIRD']['password'],
-    host=config['FIREBIRD']['host'],
-    port=int(config['FIREBIRD']['port']),
-    role=config['FIREBIRD']['role'],
-    charset=config['FIREBIRD']['charset']
-    )
-
-    '''opção 2
-    import firebirdsql
-
-    conn = firebirdsql.connect(
-        host='177.38.158.47',
-        database=r'\syspro\bd\sysdb.fbd',
-        port=3050,
-        user='USR_BI_RH_SCH',
-        password='sieccon456#',
-        role='RLBIRHSCH',
-        charset='UTF8'
-    )
-    cur = conn.cursor()
-
-    cur.execute("SELECT * FROM VW_BI_RH_SCH")
-
-    for c in cur.fetchall():
-        print(c)
-
-    conn.close()
-    '''
-    return connection
-
-
-# In[ ]:Conexao com banco Sql Server
-def sqlserver_connect():
-    driver = config['SQLSERVER']['Driver']
-    server = config['SQLSERVER']['Server']
-    database = config['SQLSERVER']['Database']
-   
-    connection = pyodbc.connect('DRIVER='+driver+';SERVER='+server+';DATABASE='+database+';Trusted_Connection=yes;')
-    return connection
-
-# In[ ]:Conexao Oracle
-def oracle_connect():
-    #warnings.filterwarnings('ignore')
-    user = config['ORACLE']['user']
-    password = config['ORACLE']['password']
-    ip = config['ORACLE']['ip']
-    sid = config['ORACLE']['sid']
-
-    connection = cx_Oracle.connect(
-        user,
-        password,
-        f'{ip}/{sid}',
-        encoding="UTF-8")
-    return connection
-
-# In[ ]:Conexao MySQL
-def mysql_connect():
-    #warnings.filterwarnings('ignore')
-    username = config['MYSQL']['username']
-    password = config['MYSQL']['password']
-    port = config['MYSQL']['port']
-    hostname = config['MYSQL']['hostname']
-    schema_name = config['MYSQL']['schema_name']
-
-    #print("mysql+pymysql://"+username+":"+password+"@"+hostname+":"+port+"/"+schema_name)
-    engine = sqlalchemy.create_engine("mysql+pymysql://"+username+":"+password+"@"+hostname+":"+port+"/"+schema_name)
+    connection_string = "DRIVER={ODBC Driver 17 for SQL Server};SERVER="+server+";DATABASE="+database+";UID="+username+";PWD="+password
+    connection_url = URL.create("mssql+pyodbc", query={"odbc_connect": connection_string})
+    engine = create_engine(connection_url)
+    
     return engine
 
-# In[ ]:Carga de Dados para o DataWareHouse
-def load_Cargas(queries_db, datawarehouse):
-    print('Loading Cargas....')
-    print(datetime.datetime.today())
+# In[ ]:Conexao com Banco de Dados de Origem - SQL Server
+def sqlserver_connect_origem(server_db):
+    if server_db == 'MSSQL':
+        server = 'tcp:mssql.orquidea.com.br'
+        username = 'hunterBI' 
+        password = 'lH43r#BA8dKb'
+        connection_string = "DRIVER={ODBC Driver 17 for SQL Server};SERVER="+server+";UID="+username+";PWD="+password
 
-    print(queries_db, datawarehouse)
-
-    #busca todas as tabelas que dos modulos do BI
-    sql_str = "SELECT id, tabela, string_ins, string_del, db_origem, tipo FROM queries where tipo = 'F' order by sequencia asc;"
-    #print(sql_str)
-
-    if queries_db == 'SQLSERVER':
-        conn_dw = sqlserver_connect()
-        cursor = conn_dw.cursor()
-        queries = cursor.execute(sql_str).fetchall()
-    elif queries_db == 'ORACLE':
-        conn_dw = oracle_connect()
-        queries = pd.read_sql(sql_str,conn_dw)
-    elif queries_db == 'MYSQL':
-        conn_dw = mysql_connect()
-        queries = pd.read_sql(sql_str,conn_dw)
-    elif queries_db == 'FIREBIRD':
-        conn_dw = firebird_connect()
-        queries = pd.read_sql(sql_str,conn_dw)
-    elif queries_db == 'POSTGRESQL':
-        conn_dw = postgresql_connect()
-        queries = pd.read_sql(sql_str,conn_dw)
+    elif server_db == 'MSSQL2':
+        server = 'tcp:mssql2.orquidea.com.br'
+        database = 'dw_tondo_bi' 
+        username = 'hunterBI' 
+        password = 'lH43r#BA8dKb'
+        connection_string = "DRIVER={ODBC Driver 17 for SQL Server};SERVER="+server+";DATABASE="+database+";UID="+username+";PWD="+password
     
-    #print(queries)
-
-    print("Exclusões")
-    for data in queries:
-        #print(data)
-        if queries_db == 'SQLSERVER':
-            cur_excl = conn_dw.cursor()
-            print(str(data[3]))
-            cur_excl.execute(str(data[3]))
-            conn_dw.commit()
-        else:
-            conn_dw.execute(sql = str(data[3]))
+    connection_url = URL.create("mssql+pyodbc", query={"odbc_connect": connection_string})
+    engine = create_engine(connection_url)
     
-    conn_dw.close()
+    return engine
+
+# In[ ]:Conexao com Banco de Dados de Origem - Progress
+def progress_connect_origem(database,port):
     
-    for data in queries:
-        print(data)
-        querie_id = str(data[0])
-        tabela = str(data[1])
-        string_ins = str(data[2])
-        #string_del = str(data[3])
-        db_origem = str(data[4])
+    server = 'progress12.orquidea.com.br'
+    #database = 'ems2cad'
+    #port = '20101'
+    username = 'sysprogress' 
+    password = 'sysprogress'
 
-        tipo = str(data[5])
+    '''
+    connection_string = "DRIVER={Progress OpenEdge 11.4 Driver};SERVER="+server+";UID="+username+";PWD="+password
 
-        #Busca os dados de extração da origem conforme tipo
-        if db_origem == 'csv':
-            print("[Before BULK INSERT...]")
-            bulkInsertCommand = 'BULK INSERT '+tabela+" FROM '"+string_ins+"' WITH (FIRSTROW = 2, FIELDTERMINATOR =';',ROWTERMINATOR ='\n');"
+    connection_url = URL.create("mssql+pyodbc", query={"odbc_connect": connection_string})
+    engine = create_engine(connection_url)
+    
+    #return engine
+    '''
+    connection_url = "HostName="+server+";DATABASENAME="+database+";PORTNUMBER="+port+";LogonID="+username+";PASSWORD="+password
+    print(connection_url)
+    cnxn = pyodbc.connect("DRIVER={Progress OpenEdge 11.7 Driver};HostName="+server+";DATABASENAME="+database+";PORTNUMBER="+port+";LogonID="+username+";PASSWORD="+password)
+    cursor = cnxn.cursor()
+
+    return cursor
+    #return cnxn
+
+
+# In[ ]:Exclusão, Extração e Carga dos dados
+def extract_load(df_queries,connection_dw):
+    for query in df_queries.itertuples(index=False):
+        print(query.tabela)
+        #print(query.string_ins)
+        #print(query.string_del)
+        #print(query.db_origem)
+        #print(query.tipo)
+        #print(query.separador)
+        #print(query.tp_origem)
+        
+        #Executa a exclusão
+        connection_dw.execute(query.string_del)
+        
+        if query.db_origem == 'PROGRESSCAD':
+            connection = progress_connect_origem('ems2cad','10050')
+        elif query.db_origem == 'PROGRESSMOV':
+            connection = progress_connect_origem('ems2mov','10150')
+        elif query.db_origem == 'PROGRESSESP':
+            connection = progress_connect_origem('ems2esp','10250')
         else:
-            if db_origem == 'ORACLE':
-                conn_ori = oracle_connect()
-            elif db_origem == 'MYSQL':
-                conn_ori = mysql_connect()
-            elif db_origem == 'FIREBIRD':
-                conn_ori = firebird_connect()
-            elif db_origem == 'POSTGRESQL':
-                conn_ori = postgresql_connect()
-            print('read_sql')
-            data_extract = pd.read_sql(string_ins, conn_ori)
-            
-        if db_origem == 'csv' and datawarehouse == 'SQLSERVER':
-            conn_dw = sqlserver_connect()
-            cursor = conn_dw.cursor()
+            connection = sqlserver_connect_origem(query.db_origem)
 
-            print("Running BULK INSERT command...")    
-            cursor.execute(bulkInsertCommand)
-            conn_dw.commit()
-            print("BULK INSERT command executed.")    
-        else:
-            #executa a inclusao no DW
-            data_extract.to_sql(tabela, con=conn_dw, if_exists='append', index=False, chunksize=10000)
+        tb_columns = pd.read_sql('SELECT * FROM '+str(query.tabela),connection_dw).columns
+        #print(tb_columns)
 
-    #executa o update na tabela para infrormar a data de atualização da mesma
-    data_atual = datetime.datetime.today() 
-    sqlUp = "update queries set dt_carga = '"+ str(data_atual) + "' where id = " + querie_id
-    #print(sqlUp)
-    conn_dw.execute(sqlUp)
-    conn_dw.execute('commit')
+        #Executa extração
+        if query.tp_origem == 'csv':
+            absolute_path = os.path.normpath(query.string_ins)
+            df_data = pd.read_csv(absolute_path,sep=query.separador.strip(), encoding = 'ISO-8859-1', names=tb_columns,skiprows=1, index_col=False)
+            #print('extract')
+            #print(df_data.head())
 
-#while True:
-print('Executando sincronismo ERP x BI...')
-print(datetime.datetime.now())
+        elif query.tp_origem == 'table':
+            if query.db_origem[:8] == 'PROGRESS':
+                connection.execute(str(query.string_ins))
+                rows = connection.fetchall()
+                df_data = pd.DataFrame((tuple(t) for t in rows),index=None,columns=tb_columns) 
+            else:
+                df_data = pd.read_sql(str(query.string_ins),connection, columns=tb_columns, index_col=False)
+
+            #print('table')
+            #print(df_data.head())
+
+        #Executa a inclusao
+        df_data.to_sql(query.tabela, con=connection_dw, if_exists='append', index=False, chunksize=10000)
+
+        #executa o update na tabela para infrormar a data de atualização da mesma
+        data_atual = datetime.datetime.today() 
+        sqlUp = "update queries set dt_carga = '"+ str(data_atual) + "' where id = " + str(query.id)
+        connection_dw.execute(sqlUp)
+
+# In[ ]:Main
 
 #Busca Queries
-banco_queries = config['DEFINITIONS']['bd_queries']
-banco_dw = config['DEFINITIONS']['bd_dw']
+banco_queries = 'MSSQL2'
+#banco_dw = 'MSSQL2'
 
-load_Cargas(banco_queries,banco_dw)
+sql_str = "SELECT id, tabela, string_ins, string_del, db_origem, tipo, separador, tp_origem FROM queries where tipo = 'D' and id = 22 order by sequencia asc;"
+#sql_str = "SELECT id, tabela, string_ins, string_del, db_origem, tipo, separador, tp_origem FROM queries where id in (20) order by sequencia asc;"
+conn_dw = sqlserver_connect_dw()
+data = pd.read_sql(sql_str,conn_dw)
 
-print("Encerrado o sincronismo...")
-print(datetime.datetime.now())
-    
+extract_load(data,conn_dw)
+
+#print(data)
+
